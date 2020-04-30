@@ -1,0 +1,87 @@
+
+# Power box
+bsize=20e-9;
+
+
+#t_sim = linspace(-70e-9,-170e-9,20);
+t_sim = -130e-9;
+
+#Bragg mirror
+nBragg = linspace(1,20,20);
+
+wlength = 860e-9;
+nl = 2.9825;
+nh = 3.5966;
+
+dl = wlength/(4*nl);
+dh  = wlength/(4*nh);
+
+dstart = 240e-9;
+
+
+#Disc
+
+#r_disc = linspace(50e-9,600e-9,23);
+#r_disc=225e-9;
+
+# reserve space for the results
+T       = matrix(length(t_sim),1);
+Ttot    = matrix(length(t_sim),1);
+Tcone1  = matrix(length(t_sim),1);
+Tcone2  = matrix(length(t_sim),1);
+Tcone3  = matrix(length(t_sim),1);
+
+
+load("Dipole_in_GaAs_with_Bragg");
+cwnorm;
+
+
+# loop over the desired distances
+for(i=1:length(t_sim)) {
+    ?"running " + num2str(i) + " of " + num2str(length(t_sim)) + " simulations";
+    ?"  Position of dipole: "+ num2str(t_sim(i)*1e9) +" nm";
+    #switchtolayout;
+    
+    for(j=1:length(nBragg)){# please remove the Pairs from simulation
+        switchtolayout;
+        # Modify position of Bragg mirror
+        addrect;
+        set("name","BR"+num2str(j));
+        set("material","AlAs");
+        coordinates = { "x" : 0                 ,"x span" : 8e-6, 
+                        "y" : 0                 , "y span" : 8e-6, 
+                        "z" : -(dstart+0.5*dl)-(j-1)*(dl+dh)  , "z span" : dl}; 
+        setnamed("BR"+num2str(j), coordinates); #Please remove all of the Pairs from simulation
+        
+        setnamed("QD","z",t_sim(i));
+        setnamed("QD","theta",90);
+        setnamed("QD","phi",0);
+        simulation;
+        setnamed("FDTD","x min bc","Anti-Symmetric");
+        setnamed("FDTD","y min bc","Symmetric");
+    
+        # Modify position of Power box
+       
+    
+        coordinates = {"x" : 0,         "x span" : bsize,
+                        "y" : 0,         "y span" : bsize, 
+                       "z" : t_sim(i),  "z span" : bsize}; 
+        setnamed("mesh", coordinates); 
+        setnamed("Totalpower",coordinates);
+    
+        run;
+   
+        T(i) =  transmission("air");
+        runanalysis;
+        Totalpower_result= getresult("Totalpower", 'T'); 
+        Ttot(i)= Totalpower_result.T;  
+    
+        ?"  Total Power:"+num2str(Ttot(i)); 
+        ?"  Fraction of power in air: " + num2str((T(i)/Ttot(i))*100) + " %";
+        write("Eff_numb_Bragg130nm.txt",num2str([nBragg(j),(T(i)/Ttot(i)*100)]));
+
+    }      
+    
+}     
+
+  
